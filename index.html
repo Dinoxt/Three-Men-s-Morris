@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Three Men's Morris</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-cream: #F3EFE0;
+            --ink-navy: #141B29;
+            --red-piece: #CC3B3B;
+            --red-border: #9E2626;
+            --blue-piece: #3E7CB1;
+            --blue-border: #28567D;
+        }
+
+        body {
+            background-color: var(--bg-cream);
+            color: var(--ink-navy);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow-x: hidden;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .title-font {
+            font-family: 'Bebas Neue', sans-serif;
+            letter-spacing: 0.04em;
+        }
+
+        /* Subtle paper grain & decorative geometric accents inspired by the reference image */
+        .bg-decor {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        /* Piece styling matching the flat-shaded circular tokens in the reference */
+        .token {
+            border-radius: 9999px;
+            transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, opacity 0.2s ease;
+            position: relative;
+        }
+
+        .token-red {
+            background-color: var(--red-piece);
+            border: 4px solid var(--red-border);
+            box-shadow: 0 4px 0 rgba(20, 27, 41, 0.15);
+        }
+
+        .token-blue {
+            background-color: var(--blue-piece);
+            border: 4px solid var(--blue-border);
+            box-shadow: 0 4px 0 rgba(20, 27, 41, 0.15);
+        }
+
+        .token-selected {
+            transform: scale(1.18) translateY(-3px);
+            box-shadow: 0 0 0 4px #F3EFE0, 0 0 0 7px var(--ink-navy), 0 10px 15px rgba(20, 27, 41, 0.25);
+            z-index: 20;
+        }
+
+        .token-pulse {
+            animation: gentlePulse 1.6s infinite ease-in-out;
+        }
+
+        @keyframes gentlePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        /* Valid move indicator ring */
+        .valid-target {
+            animation: targetPulse 1.2s infinite ease-in-out;
+        }
+
+        @keyframes targetPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.85; }
+            50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+        }
+
+        /* Winning line animation */
+        .win-line {
+            stroke-dasharray: 500;
+            stroke-dashoffset: 500;
+            animation: drawLine 0.55s ease-out forwards;
+        }
+
+        @keyframes drawLine {
+            to { stroke-dashoffset: 0; }
+        }
+
+        /* Custom pill toggle buttons */
+        .mode-btn {
+            transition: all 0.2s ease;
+        }
+        .mode-btn.active {
+            background-color: var(--ink-navy);
+            color: var(--bg-cream);
+            box-shadow: 0 4px 10px rgba(20, 27, 41, 0.2);
+        }
+
+        /* Smooth screen transitions */
+        .screen-view {
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center py-4 px-4 sm:py-6">
+
+    <!-- Decorative Background Elements (Hatched Circles & Rings like the poster) -->
+    <div class="bg-decor">
+        <svg class="w-full h-full opacity-35" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <pattern id="hatch" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                    <line x1="0" y1="0" x2="0" y2="8" stroke="#141B29" stroke-width="1.5" />
+                </pattern>
+            </defs>
+            <!-- Top Left Hatched Circle -->
+            <circle cx="4%" cy="5%" r="85" fill="url(#hatch)" />
+            <!-- Top Right Hatched Circle & Ring -->
+            <circle cx="96%" cy="3%" r="65" fill="url(#hatch)" />
+            <circle cx="96%" cy="9%" r="48" fill="none" stroke="#141B29" stroke-width="1.2" />
+            <!-- Mid Left Hatched Arc -->
+            <circle cx="-2%" cy="55%" r="75" fill="url(#hatch)" />
+            <!-- Bottom Left Rings & Hatch -->
+            <circle cx="2%" cy="86%" r="26" fill="none" stroke="#141B29" stroke-width="1.2" />
+            <circle cx="14%" cy="91%" r="48" fill="none" stroke="#141B29" stroke-width="1" />
+            <circle cx="23%" cy="98%" r="70" fill="url(#hatch)" />
+            <!-- Bottom Right Hatched Circle -->
+            <circle cx="94%" cy="95%" r="95" fill="url(#hatch)" />
+        </svg>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MAIN MENU SCREEN (Title, Scoreboard, Mode & Settings)     -->
+    <!-- ========================================================= -->
+    <section id="main-menu-screen" class="screen-view relative z-10 w-full max-w-md flex flex-col items-center text-center my-auto">
+        <!-- Poster Emblem Preview -->
+        <div class="flex items-center justify-center gap-3 mb-2">
+            <span class="w-5 h-5 rounded-full token-red inline-block"></span>
+            <span class="w-5 h-5 rounded-full token-blue inline-block"></span>
+            <span class="w-5 h-5 rounded-full token-red inline-block"></span>
+        </div>
+
+        <!-- Game Name -->
+        <h1 class="title-font text-6xl sm:text-7xl text-[#141B29] leading-none tracking-wide mb-1">
+            THREE MEN'S MORRIS
+        </h1>
+        <p class="text-xs sm:text-sm font-semibold text-[#141B29]/70 mb-5">
+            Classic Strategy Alignment Game
+        </p>
+
+        <!-- Overall Scoreboard Card -->
+        <div class="w-full bg-[#E5DEC9]/80 border-2 border-[#141B29]/20 rounded-3xl p-4 mb-4 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[11px] font-extrabold uppercase tracking-widest text-[#141B29]/70">Session Scoreboard</span>
+                <button onclick="resetScores()" class="text-[11px] font-bold underline text-[#141B29]/70 hover:text-[#141B29]">
+                    Reset Score
+                </button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-[#F3EFE0] border border-[#3E7CB1]/30 rounded-2xl p-2.5 flex flex-col items-center">
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="w-3 h-3 rounded-full bg-[#3E7CB1]"></span>
+                        <span id="menu-blue-name" class="text-xs font-extrabold text-[#28567D]">BLUE (YOU)</span>
+                    </div>
+                    <span id="menu-blue-score" class="title-font text-3xl text-[#141B29] leading-none">0</span>
+                </div>
+                <div class="bg-[#F3EFE0] border border-[#CC3B3B]/30 rounded-2xl p-2.5 flex flex-col items-center">
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="w-3 h-3 rounded-full bg-[#CC3B3B]"></span>
+                        <span id="menu-red-name" class="text-xs font-extrabold text-[#9E2626]">RED (AI)</span>
+                    </div>
+                    <span id="menu-red-score" class="title-font text-3xl text-[#141B29] leading-none">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Settings Panel -->
+        <div class="w-full bg-white/75 border-2 border-[#141B29]/15 rounded-3xl p-4 mb-5 shadow-sm space-y-3.5 text-left">
+            <div class="text-[11px] font-extrabold uppercase tracking-widest text-[#141B29]/70 text-center">
+                Game Settings
+            </div>
+
+            <!-- Opponent Mode -->
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-xs sm:text-sm font-bold text-[#141B29]">Opponent</span>
+                <div class="inline-flex p-1 rounded-full bg-[#E5DEC9] border border-[#141B29]/15">
+                    <button id="btn-mode-ai" onclick="setGameMode('ai')" class="mode-btn active px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5">
+                        <span>🤖</span> Vs AI
+                    </button>
+                    <button id="btn-mode-pvp" onclick="setGameMode('pvp')" class="mode-btn px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 text-[#141B29]">
+                        <span>👥</span> With Friend
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI Difficulty (Shown when Vs AI is active) -->
+            <div id="ai-level-wrapper" class="flex items-center justify-between gap-2">
+                <span class="text-xs sm:text-sm font-bold text-[#141B29]">AI Level</span>
+                <div class="inline-flex p-1 rounded-full bg-[#E5DEC9] border border-[#141B29]/15">
+                    <button id="btn-diff-easy" onclick="setDifficulty('easy')" class="mode-btn px-3.5 py-1.5 rounded-full text-xs font-bold text-[#141B29]">
+                        Casual
+                    </button>
+                    <button id="btn-diff-hard" onclick="setDifficulty('hard')" class="mode-btn active px-3.5 py-1.5 rounded-full text-xs font-bold">
+                        Master
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sound Effects Toggle -->
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-xs sm:text-sm font-bold text-[#141B29]">Sound Effects</span>
+                <div class="inline-flex p-1 rounded-full bg-[#E5DEC9] border border-[#141B29]/15">
+                    <button id="btn-sound-on" onclick="setSound(true)" class="mode-btn active px-3.5 py-1.5 rounded-full text-xs font-bold">
+                        On
+                    </button>
+                    <button id="btn-sound-off" onclick="setSound(false)" class="mode-btn px-3.5 py-1.5 rounded-full text-xs font-bold text-[#141B29]">
+                        Off
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Primary Menu Action Buttons -->
+        <div class="w-full flex flex-col gap-2.5">
+            <button onclick="startGame()" class="w-full py-3.5 rounded-full bg-[#141B29] text-[#F3EFE0] title-font text-2xl tracking-wider shadow-lg hover:bg-[#232f47] active:scale-95 transition flex items-center justify-center gap-2">
+                <span>PLAY GAME</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+            <button onclick="toggleRules(true)" class="w-full py-2.5 rounded-full bg-[#E5DEC9] text-[#141B29] border border-[#141B29]/20 text-xs sm:text-sm font-bold hover:bg-[#dcd3b8] active:scale-95 transition">
+                How to Play
+            </button>
+        </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- ACTIVE GAMEPLAY SCREEN                                    -->
+    <!-- ========================================================= -->
+    <div id="game-screen" class="screen-view hidden relative z-10 w-full max-w-2xl h-[100dvh] flex-col items-center justify-between py-3 px-2 sm:py-5">
+        
+        <!-- Top Minimal Bar: Menu Button & Score Pill Only -->
+        <header class="w-full flex items-center justify-between gap-2 shrink-0">
+            <button onclick="openMenu()" class="px-4 py-2 rounded-full bg-[#E5DEC9] text-[#141B29] border border-[#141B29]/20 text-xs sm:text-sm font-extrabold hover:bg-[#dcd3b8] active:scale-95 transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                Menu
+            </button>
+
+            <!-- Compact Live Scoreboard Pill -->
+            <div class="px-4 py-2 rounded-full bg-[#E5DEC9] border border-[#141B29]/20 flex items-center gap-2.5 text-xs sm:text-sm font-extrabold">
+                <span class="flex items-center gap-1.5 text-[#28567D]">
+                    <span class="w-3 h-3 rounded-full bg-[#3E7CB1]"></span>
+                    <span id="hud-blue-score">0</span>
+                </span>
+                <span class="text-[#141B29]/40">:</span>
+                <span class="flex items-center gap-1.5 text-[#9E2626]">
+                    <span id="hud-red-score">0</span>
+                    <span class="w-3 h-3 rounded-full bg-[#CC3B3B]"></span>
+                </span>
+            </div>
+        </header>
+
+        <!-- Main Game Arena (Maximized Board & Trays) -->
+        <main class="flex flex-col items-center justify-center flex-1 w-full my-auto overflow-hidden">
+            
+            <!-- Top Reserve Tray: RED PLAYER -->
+            <div id="red-tray" class="flex items-center justify-center gap-6 sm:gap-9 h-14 sm:h-16 mb-3 sm:mb-5 shrink-0">
+                <!-- 3 Red Reserve Tokens injected via JS -->
+            </div>
+
+            <!-- Game Board Container (Dynamically sized to fill available viewport on mobile & desktop) -->
+            <div class="relative w-[min(92vw,56dvh,520px)] h-[min(92vw,56dvh,520px)] flex items-center justify-center shrink-0">
+                <!-- SVG Board Lines & Nodes matching the poster -->
+                <svg id="board-svg" viewBox="0 0 300 300" class="w-full h-full overflow-visible drop-shadow-sm">
+                    <!-- Outer Square -->
+                    <rect x="30" y="30" width="240" height="240" fill="none" stroke="#141B29" stroke-width="5.5" stroke-linejoin="round" />
+                    
+                    <!-- Horizontal & Vertical Center Lines -->
+                    <line x1="150" y1="30" x2="150" y2="270" stroke="#141B29" stroke-width="5" />
+                    <line x1="30" y1="150" x2="270" y2="150" stroke="#141B29" stroke-width="5" />
+                    
+                    <!-- Diagonal Lines -->
+                    <line x1="30" y1="30" x2="270" y2="270" stroke="#141B29" stroke-width="5" />
+                    <line x1="270" y1="30" x2="30" y2="270" stroke="#141B29" stroke-width="5" />
+
+                    <!-- 9 Intersection Dots -->
+                    <g fill="#141B29">
+                        <circle cx="30" cy="30" r="8.5" />
+                        <circle cx="150" cy="30" r="8.5" />
+                        <circle cx="270" cy="30" r="8.5" />
+                        <circle cx="30" cy="150" r="8.5" />
+                        <circle cx="150" cy="150" r="8.5" />
+                        <circle cx="270" cy="150" r="8.5" />
+                        <circle cx="30" cy="270" r="8.5" />
+                        <circle cx="150" cy="270" r="8.5" />
+                        <circle cx="270" cy="270" r="8.5" />
+                    </g>
+
+                    <!-- Winning Highlight Line Layer -->
+                    <g id="win-line-layer"></g>
+                </svg>
+
+                <!-- Interactive Hitboxes & Placed Pieces Overlay -->
+                <div id="nodes-overlay" class="absolute inset-0">
+                    <!-- 9 interactive node buttons injected via JS -->
+                </div>
+            </div>
+
+            <!-- Bottom Reserve Tray: BLUE PLAYER -->
+            <div id="blue-tray" class="flex items-center justify-center gap-6 sm:gap-9 h-14 sm:h-16 mt-3 sm:mt-5 shrink-0">
+                <!-- 3 Blue Reserve Tokens injected via JS -->
+            </div>
+
+        </main>
+
+        <!-- Footer Action: New Round Only -->
+        <footer class="w-full flex items-center justify-center shrink-0">
+            <button onclick="resetGame()" class="px-6 py-2.5 rounded-full bg-[#141B29] text-[#F3EFE0] text-xs sm:text-sm font-bold shadow-md hover:bg-[#232f47] active:scale-95 transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                New Round
+            </button>
+        </footer>
+    </div>
+
+    <!-- Victory / Result Modal Banner -->
+    <div id="win-modal" class="fixed inset-0 z-40 bg-[#141B29]/45 backdrop-blur-[2px] hidden items-center justify-center p-4">
+        <div class="bg-[#F3EFE0] border-4 border-[#141B29] rounded-3xl p-6 max-w-xs w-full text-center shadow-2xl transform transition-all scale-100">
+            <div id="win-badge" class="w-16 h-16 mx-auto mb-3 rounded-full token-blue flex items-center justify-center text-white text-2xl font-black shadow-md">
+                ★
+            </div>
+            <h2 id="win-title" class="title-font text-4xl text-[#141B29] tracking-wide mb-1">BLUE WINS!</h2>
+            <p id="win-subtitle" class="text-sm text-[#141B29]/80 font-semibold mb-4">3 in a row achieved!</p>
+            
+            <!-- Modal Score Summary -->
+            <div class="flex items-center justify-center gap-4 py-2 px-4 mb-5 rounded-2xl bg-[#E5DEC9]/80 border border-[#141B29]/15 text-xs font-extrabold">
+                <span class="text-[#28567D]">BLUE: <span id="modal-blue-score">0</span></span>
+                <span class="text-[#141B29]/30">|</span>
+                <span class="text-[#9E2626]">RED: <span id="modal-red-score">0</span></span>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <button onclick="resetGame()" class="w-full py-3 rounded-full bg-[#141B29] text-[#F3EFE0] font-bold text-sm tracking-wide shadow-lg hover:bg-[#232f47] active:scale-95 transition">
+                    Play Again
+                </button>
+                <button onclick="openMenu()" class="w-full py-2.5 rounded-full bg-[#E5DEC9] text-[#141B29] font-bold text-xs tracking-wide hover:bg-[#dcd3b8] active:scale-95 transition">
+                    Main Menu & Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- How to Play Modal -->
+    <div id="rules-modal" class="fixed inset-0 z-50 bg-[#141B29]/50 backdrop-blur-[2px] hidden items-center justify-center p-4" onclick="if(event.target===this) toggleRules(false)">
+        <div class="bg-[#F3EFE0] border-4 border-[#141B29] rounded-3xl p-6 max-w-sm w-full shadow-2xl">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="title-font text-3xl text-[#141B29]">HOW TO PLAY</h2>
+                <button onclick="toggleRules(false)" class="w-8 h-8 rounded-full bg-[#E5DEC9] font-bold text-[#141B29] flex items-center justify-center">✕</button>
+            </div>
+            <ul class="space-y-3 text-sm text-[#141B29]/90 leading-relaxed">
+                <li class="flex gap-2.5">
+                    <span class="font-extrabold text-[#3E7CB1]">1.</span>
+                    <span><strong>Placement Phase:</strong> Players take turns placing their 3 pieces on any empty dot on the board.</span>
+                </li>
+                <li class="flex gap-2.5">
+                    <span class="font-extrabold text-[#CC3B3B]">2.</span>
+                    <span><strong>Movement Phase:</strong> Once all 3 pieces are placed, take turns sliding one of your pieces along a connected line to an adjacent empty dot.</span>
+                </li>
+                <li class="flex gap-2.5">
+                    <span class="font-extrabold text-[#141B29]">3.</span>
+                    <span><strong>Winning:</strong> Be the first to align all 3 of your pieces in a straight row (horizontally, vertically, or diagonally)!</span>
+                </li>
+            </ul>
+            <button onclick="toggleRules(false)" class="mt-5 w-full py-2.5 rounded-full bg-[#141B29] text-[#F3EFE0] font-bold text-sm">
+                Got It!
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * THREE MEN'S MORRIS — COMPLETE GAME ENGINE
+         * Supports 2-Phase Gameplay (Placement -> Movement), Pass & Play, and Minimax AI.
+         */
+
+        // --- BOARD TOPOLOGY ---
+        // Node indices 0 to 8 correspond to a 3x3 grid:
+        // 0 - 1 - 2
+        // | \ | / |
+        // 3 - 4 - 5
+        // | / | \ |
+        // 6 - 7 - 8
+        const NODE_COORDS = [
+            { x: 10, y: 10, svgX: 30,  svgY: 30  }, // 0: Top-Left
+            { x: 50, y: 10, svgX: 150, svgY: 30  }, // 1: Top-Mid
+            { x: 90, y: 10, svgX: 270, svgY: 30  }, // 2: Top-Right
+            { x: 10, y: 50, svgX: 30,  svgY: 150 }, // 3: Mid-Left
+            { x: 50, y: 50, svgX: 150, svgY: 150 }, // 4: Center
+            { x: 90, y: 50, svgX: 270, svgY: 150 }, // 5: Mid-Right
+            { x: 10, y: 90, svgX: 30,  svgY: 270 }, // 6: Bottom-Left
+            { x: 50, y: 90, svgX: 150, svgY: 270 }, // 7: Bottom-Mid
+            { x: 90, y: 90, svgX: 270, svgY: 270 }  // 8: Bottom-Right
+        ];
+
+        // Exact lines drawn on the poster board
+        const ADJACENCY = {
+            0: [1, 3, 4],
+            1: [0, 2, 4],
+            2: [1, 4, 5],
+            3: [0, 4, 6],
+            4: [0, 1, 2, 3, 5, 6, 7, 8],
+            5: [2, 4, 8],
+            6: [3, 4, 7],
+            7: [4, 6, 8],
+            8: [4, 5, 7]
+        };
+
+        // All 8 possible 3-in-a-row winning lines
+        const WIN_LINES = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Horizontals
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Verticals
+            [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        // --- GAME STATE ---
+        let board = Array(9).fill(null); // null | 'blue' | 'red'
+        let turn = 'blue';               // 'blue' starts first
+        let placedCount = { blue: 0, red: 0 };
+        let selectedNode = null;         // Index of piece selected during movement phase
+        let gameMode = 'ai';             // 'ai' | 'pvp'
+        let aiDifficulty = 'hard';       // 'easy' | 'hard'
+        let gameOver = false;
+        let aiThinking = false;
+        let scores = { blue: 0, red: 0 };
+        let soundEnabled = true;
+
+        // --- WEB AUDIO SYNTHESIZER (Tactile wooden token clicks & chimes) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTone(type) {
+            if (!soundEnabled) return;
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+                if (type === 'place') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.09);
+                    gain.gain.setValueAtTime(0.28, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+                    osc.start(now);
+                    osc.stop(now + 0.09);
+                } else if (type === 'select') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(420, now);
+                    osc.frequency.exponentialRampToValueAtTime(560, now + 0.07);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+                    osc.start(now);
+                    osc.stop(now + 0.07);
+                } else if (type === 'win') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(330, now);
+                    osc.frequency.setValueAtTime(440, now + 0.1);
+                    osc.frequency.setValueAtTime(660, now + 0.2);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                    osc.start(now);
+                    osc.stop(now + 0.45);
+                }
+            } catch (e) {
+                // Ignore audio errors on restricted devices
+            }
+        }
+
+        function toggleSound() {
+            setSound(!soundEnabled);
+        }
+
+        function setSound(enabled) {
+            soundEnabled = enabled;
+
+            // Sync Menu Sound Buttons
+            document.getElementById('btn-sound-on').classList.toggle('active', soundEnabled);
+            document.getElementById('btn-sound-on').classList.toggle('text-[#141B29]', !soundEnabled);
+            document.getElementById('btn-sound-off').classList.toggle('active', !soundEnabled);
+            document.getElementById('btn-sound-off').classList.toggle('text-[#141B29]', soundEnabled);
+        }
+
+        // --- SCREEN NAVIGATION (MENU <-> GAME) ---
+        function startGame() {
+            document.getElementById('main-menu-screen').classList.add('hidden');
+            const gameScreen = document.getElementById('game-screen');
+            gameScreen.classList.remove('hidden');
+            gameScreen.classList.add('flex');
+            resetGame();
+        }
+
+        function openMenu() {
+            // Hide any active victory modal
+            const modal = document.getElementById('win-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            // Switch to Main Menu
+            const gameScreen = document.getElementById('game-screen');
+            gameScreen.classList.add('hidden');
+            gameScreen.classList.remove('flex');
+            document.getElementById('main-menu-screen').classList.remove('hidden');
+            syncScoreUI();
+        }
+
+        function syncScoreUI() {
+            // Update Menu Scoreboard
+            document.getElementById('menu-blue-score').textContent = scores.blue;
+            document.getElementById('menu-red-score').textContent = scores.red;
+            document.getElementById('menu-red-name').textContent = gameMode === 'ai' ? 'RED (AI)' : 'RED (P2)';
+            document.getElementById('menu-blue-name').textContent = gameMode === 'ai' ? 'BLUE (YOU)' : 'BLUE (P1)';
+
+            // Update Gameplay HUD & Badges
+            document.getElementById('hud-blue-score').textContent = scores.blue;
+            // Update Gameplay HUD & Modal Scores
+            document.getElementById('hud-blue-score').textContent = scores.blue;
+            document.getElementById('hud-red-score').textContent = scores.red;
+            document.getElementById('modal-blue-score').textContent = scores.blue;
+            document.getElementById('modal-red-score').textContent = scores.red;
+        }
+
+        function resetScores() {
+            scores = { blue: 0, red: 0 };
+            syncScoreUI();
+            playTone('select');
+        }
+
+        // --- INITIALIZATION & UI RENDERING ---
+        function initBoardUI() {
+            const overlay = document.getElementById('nodes-overlay');
+            overlay.innerHTML = '';
+
+            NODE_COORDS.forEach((coord, index) => {
+                const btn = document.createElement('button');
+                btn.id = `node-${index}`;
+                btn.type = 'button';
+                btn.ariaLabel = `Board position ${index + 1}`;
+                btn.style.left = `${coord.x}%`;
+                btn.style.top = `${coord.y}%`;
+                btn.className = 'absolute -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center focus:outline-none cursor-pointer';
+                btn.onclick = () => handleNodeClick(index);
+                overlay.appendChild(btn);
+            });
+
+            renderAll();
+        }
+
+        function renderAll() {
+            renderTrays();
+            renderBoardPieces();
+        }
+
+        function renderTrays() {
+            const redTray = document.getElementById('red-tray');
+            const blueTray = document.getElementById('blue-tray');
+            redTray.innerHTML = '';
+            blueTray.innerHTML = '';
+
+            const redRemaining = 3 - placedCount.red;
+            const blueRemaining = 3 - placedCount.blue;
+
+            for (let i = 0; i < 3; i++) {
+                const redPiece = document.createElement('div');
+                const isRedAvailable = i < redRemaining;
+                redPiece.className = `w-12 h-12 sm:w-14 sm:h-14 token token-red ${isRedAvailable ? 'opacity-100' : 'opacity-15 scale-90'} ${isRedAvailable && turn === 'red' && !gameOver ? 'token-pulse' : ''}`;
+                redTray.appendChild(redPiece);
+
+                const bluePiece = document.createElement('div');
+                const isBlueAvailable = i < blueRemaining;
+                bluePiece.className = `w-12 h-12 sm:w-14 sm:h-14 token token-blue ${isBlueAvailable ? 'opacity-100' : 'opacity-15 scale-90'} ${isBlueAvailable && turn === 'blue' && !gameOver ? 'token-pulse' : ''}`;
+                blueTray.appendChild(bluePiece);
+            }
+        }
+
+        function renderBoardPieces() {
+            const isPlacementPhase = placedCount[turn] < 3;
+            const validDestinations = (!gameOver && !aiThinking && !isPlacementPhase && selectedNode !== null)
+                ? ADJACENCY[selectedNode].filter(adj => board[adj] === null)
+                : [];
+
+            for (let i = 0; i < 9; i++) {
+                const cell = document.getElementById(`node-${i}`);
+                cell.innerHTML = '';
+                const owner = board[i];
+
+                if (owner) {
+                    const piece = document.createElement('div');
+                    const isSelected = selectedNode === i;
+                    const canSelect = !gameOver && !aiThinking && !isPlacementPhase && owner === turn;
+
+                    piece.className = `w-12 h-12 sm:w-14 sm:h-14 token ${owner === 'red' ? 'token-red' : 'token-blue'} ${isSelected ? 'token-selected' : ''} ${canSelect && !isSelected ? 'hover:scale-105' : ''}`;
+                    cell.appendChild(piece);
+                } else {
+                    // Empty spot: show subtle indicator if it's a valid placement or valid slide destination
+                    const isPlaceable = !gameOver && !aiThinking && isPlacementPhase && !(gameMode === 'ai' && turn === 'red');
+                    const isSlideTarget = validDestinations.includes(i);
+
+                    if (isSlideTarget) {
+                        const ring = document.createElement('div');
+                        ring.style.left = '50%';
+                        ring.style.top = '50%';
+                        ring.className = `absolute w-10 h-10 sm:w-12 sm:h-12 rounded-full border-[3px] border-dashed ${turn === 'blue' ? 'border-[#3E7CB1] bg-[#3E7CB1]/20' : 'border-[#CC3B3B] bg-[#CC3B3B]/20'} valid-target pointer-events-none`;
+                        cell.appendChild(ring);
+                    } else if (isPlaceable) {
+                        const hoverHint = document.createElement('div');
+                        hoverHint.className = `w-8 h-8 sm:w-9 sm:h-9 rounded-full opacity-0 hover:opacity-40 transition-opacity ${turn === 'blue' ? 'bg-[#3E7CB1]' : 'bg-[#CC3B3B]'}`;
+                        cell.appendChild(hoverHint);
+                    }
+                }
+            }
+        }
+
+        function updateStatusBanner() {
+            // Status banner removed from active gameplay for a distraction-free board
+        }
+
+        // --- PLAYER INTERACTION ---
+        function handleNodeClick(index) {
+            if (gameOver || aiThinking) return;
+            if (gameMode === 'ai' && turn === 'red') return;
+
+            const isPlacementPhase = placedCount[turn] < 3;
+
+            if (isPlacementPhase) {
+                // Phase 1: Place a reserve piece on an empty node
+                if (board[index] === null) {
+                    executePlacement(index, turn);
+                }
+            } else {
+                // Phase 2: Select own piece, then slide to an adjacent empty node
+                if (board[index] === turn) {
+                    selectedNode = (selectedNode === index) ? null : index;
+                    playTone('select');
+                    renderAll();
+                } else if (board[index] === null && selectedNode !== null) {
+                    if (ADJACENCY[selectedNode].includes(index)) {
+                        executeMove(selectedNode, index, turn);
+                    }
+                }
+            }
+        }
+
+        function executePlacement(index, player) {
+            board[index] = player;
+            placedCount[player]++;
+            playTone('place');
+
+            if (checkAndHandleWin(player)) return;
+
+            switchTurn();
+        }
+
+        function executeMove(fromIndex, toIndex, player) {
+            board[fromIndex] = null;
+            board[toIndex] = player;
+            selectedNode = null;
+            playTone('place');
+
+            if (checkAndHandleWin(player)) return;
+
+            switchTurn();
+        }
+
+        function switchTurn() {
+            turn = (turn === 'blue') ? 'red' : 'blue';
+            selectedNode = null;
+            renderAll();
+
+            // Check if the next player has any valid moves in Movement Phase
+            if (placedCount[turn] === 3 && !hasAnyValidMove(board, turn)) {
+                // Rare stalemate rule: player unable to move loses
+                const winner = turn === 'blue' ? 'red' : 'blue';
+                declareWinner(winner, null, 'Opponent has no legal moves!');
+                return;
+            }
+
+            if (gameMode === 'ai' && turn === 'red' && !gameOver) {
+                aiThinking = true;
+                updateStatusBanner();
+                setTimeout(performAIMove, 480);
+            }
+        }
+
+        function checkAndHandleWin(player) {
+            const winningLine = getWinningLine(board, player);
+            if (winningLine) {
+                declareWinner(player, winningLine, '3 in a row achieved!');
+                return true;
+            }
+            return false;
+        }
+
+        function declareWinner(winner, line, subtitle) {
+            gameOver = true;
+            aiThinking = false;
+            scores[winner]++;
+
+            syncScoreUI();
+
+            renderAll();
+            playTone('win');
+
+            if (line) {
+                drawWinningLine(line, winner);
+            }
+
+            // Show Modal after a brief moment so player sees the winning line
+            setTimeout(() => {
+                const modal = document.getElementById('win-modal');
+                const badge = document.getElementById('win-badge');
+                const title = document.getElementById('win-title');
+                const sub = document.getElementById('win-subtitle');
+
+                badge.className = `w-16 h-16 mx-auto mb-3 rounded-full ${winner === 'blue' ? 'token-blue' : 'token-red'} flex items-center justify-center text-white text-2xl font-black shadow-md`;
+                title.textContent = winner === 'blue'
+                    ? (gameMode === 'ai' ? 'YOU WIN!' : 'BLUE WINS!')
+                    : (gameMode === 'ai' ? 'AI WINS!' : 'RED WINS!');
+                sub.textContent = subtitle;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }, 650);
+        }
+
+        function drawWinningLine(line, winner) {
+            const layer = document.getElementById('win-line-layer');
+            const p1 = NODE_COORDS[line[0]];
+            const p3 = NODE_COORDS[line[2]];
+            const color = winner === 'blue' ? '#3E7CB1' : '#CC3B3B';
+
+            layer.innerHTML = `
+                <line x1="${p1.svgX}" y1="${p1.svgY}" x2="${p3.svgX}" y2="${p3.svgY}"
+                      stroke="${color}" stroke-width="11" stroke-linecap="round" opacity="0.85" class="win-line" />
+            `;
+        }
+
+        // --- AI ENGINE (MINIMAX WITH ALPHA-BETA PRUNING) ---
+        function performAIMove() {
+            if (gameOver) return;
+
+            const isPlacement = placedCount.red < 3;
+
+            if (aiDifficulty === 'easy') {
+                // Casual AI: Makes occasional random moves, blocks immediate wins
+                const move = getCasualAIMove(isPlacement);
+                applyAIMove(move);
+            } else {
+                // Master AI: Deep lookahead Minimax
+                const move = getBestMinimaxMove();
+                applyAIMove(move);
+            }
+        }
+
+        function applyAIMove(move) {
+            aiThinking = false;
+            if (!move) return;
+            if (move.type === 'place') {
+                executePlacement(move.to, 'red');
+            } else {
+                executeMove(move.from, move.to, 'red');
+            }
+        }
+
+        function getCasualAIMove(isPlacement) {
+            const possibleMoves = getAllLegalMoves(board, 'red', placedCount.red);
+            if (possibleMoves.length === 0) return null;
+
+            // 1. Check if AI can win right now
+            for (const m of possibleMoves) {
+                const sim = simulateMove(board, m, 'red');
+                if (getWinningLine(sim, 'red')) return m;
+            }
+
+            // 2. 65% chance to block opponent's immediate win
+            if (Math.random() < 0.65) {
+                const oppMoves = getAllLegalMoves(board, 'blue', placedCount.blue);
+                for (const om of oppMoves) {
+                    const sim = simulateMove(board, om, 'blue');
+                    if (getWinningLine(sim, 'blue')) {
+                        // Find an AI move that lands on om.to
+                        const blocker = possibleMoves.find(m => m.to === om.to);
+                        if (blocker) return blocker;
+                    }
+                }
+            }
+
+            // 3. Otherwise pick a random legal move
+            return possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+        }
+
+        function getBestMinimaxMove() {
+            const legalMoves = getAllLegalMoves(board, 'red', placedCount.red);
+            if (legalMoves.length === 0) return null;
+
+            // Prioritize center on first move if open for crisp opening play
+            if (placedCount.red === 0 && board[4] === null) {
+                return { type: 'place', to: 4 };
+            }
+
+            let bestScore = -Infinity;
+            let bestMoves = [];
+            const maxDepth = 5;
+
+            for (const move of legalMoves) {
+                const nextBoard = simulateMove(board, move, 'red');
+                const nextPlaced = {
+                    blue: placedCount.blue,
+                    red: move.type === 'place' ? placedCount.red + 1 : placedCount.red
+                };
+
+                const score = minimax(nextBoard, nextPlaced, maxDepth - 1, false, -Infinity, Infinity);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMoves = [move];
+                } else if (score === bestScore) {
+                    bestMoves.push(move);
+                }
+            }
+
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        }
+
+        function minimax(simBoard, simPlaced, depth, isMaximizing, alpha, beta) {
+            if (getWinningLine(simBoard, 'red')) return 100 + depth;
+            if (getWinningLine(simBoard, 'blue')) return -100 - depth;
+            if (depth === 0) return evaluateBoard(simBoard);
+
+            const currentPlayer = isMaximizing ? 'red' : 'blue';
+            const moves = getAllLegalMoves(simBoard, currentPlayer, simPlaced[currentPlayer]);
+
+            if (moves.length === 0) {
+                return isMaximizing ? -90 : 90;
+            }
+
+            if (isMaximizing) {
+                let maxEval = -Infinity;
+                for (const m of moves) {
+                    const nextB = simulateMove(simBoard, m, 'red');
+                    const nextP = {
+                        blue: simPlaced.blue,
+                        red: m.type === 'place' ? simPlaced.red + 1 : simPlaced.red
+                    };
+                    const ev = minimax(nextB, nextP, depth - 1, false, alpha, beta);
+                    maxEval = Math.max(maxEval, ev);
+                    alpha = Math.max(alpha, ev);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (const m of moves) {
+                    const nextB = simulateMove(simBoard, m, 'blue');
+                    const nextP = {
+                        red: simPlaced.red,
+                        blue: m.type === 'place' ? simPlaced.blue + 1 : simPlaced.blue
+                    };
+                    const ev = minimax(nextB, nextP, depth - 1, true, alpha, beta);
+                    minEval = Math.min(minEval, ev);
+                    beta = Math.min(beta, ev);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        function evaluateBoard(b) {
+            let score = 0;
+            // Center control bonus
+            if (b[4] === 'red') score += 6;
+            if (b[4] === 'blue') score -= 6;
+
+            // Two-in-a-row potential
+            for (const [a, c, d] of WIN_LINES) {
+                const line = [b[a], b[c], b[d]];
+                const reds = line.filter(x => x === 'red').length;
+                const blues = line.filter(x => x === 'blue').length;
+                const empty = line.filter(x => x === null).length;
+
+                if (reds === 2 && empty === 1) score += 12;
+                if (blues === 2 && empty === 1) score -= 12;
+            }
+            return score;
+        }
+
+        function getAllLegalMoves(b, player, countPlaced) {
+            const moves = [];
+            if (countPlaced < 3) {
+                for (let i = 0; i < 9; i++) {
+                    if (b[i] === null) moves.push({ type: 'place', to: i });
+                }
+            } else {
+                for (let i = 0; i < 9; i++) {
+                    if (b[i] === player) {
+                        for (const adj of ADJACENCY[i]) {
+                            if (b[adj] === null) {
+                                moves.push({ type: 'move', from: i, to: adj });
+                            }
+                        }
+                    }
+                }
+            }
+            return moves;
+        }
+
+        function simulateMove(b, move, player) {
+            const copy = [...b];
+            if (move.type === 'place') {
+                copy[move.to] = player;
+            } else {
+                copy[move.from] = null;
+                copy[move.to] = player;
+            }
+            return copy;
+        }
+
+        function hasAnyValidMove(b, player) {
+            for (let i = 0; i < 9; i++) {
+                if (b[i] === player) {
+                    if (ADJACENCY[i].some(adj => b[adj] === null)) return true;
+                }
+            }
+            return false;
+        }
+
+        function getWinningLine(b, player) {
+            for (const line of WIN_LINES) {
+                if (b[line[0]] === player && b[line[1]] === player && b[line[2]] === player) {
+                    return line;
+                }
+            }
+            return null;
+        }
+
+        // --- MODE & RESET CONTROLS ---
+        function setGameMode(mode) {
+            gameMode = mode;
+            document.getElementById('btn-mode-ai').classList.toggle('active', mode === 'ai');
+            document.getElementById('btn-mode-ai').classList.toggle('text-[#141B29]', mode !== 'ai');
+
+            document.getElementById('btn-mode-pvp').classList.toggle('active', mode === 'pvp');
+            document.getElementById('btn-mode-pvp').classList.toggle('text-[#141B29]', mode !== 'pvp');
+
+            const aiWrapper = document.getElementById('ai-level-wrapper');
+            aiWrapper.classList.toggle('hidden', mode !== 'ai');
+            aiWrapper.classList.toggle('flex', mode === 'ai');
+
+            scores = { blue: 0, red: 0 };
+            syncScoreUI();
+            playTone('select');
+        }
+
+        function setDifficulty(diff) {
+            aiDifficulty = diff;
+            document.getElementById('btn-diff-easy').classList.toggle('active', diff === 'easy');
+            document.getElementById('btn-diff-easy').classList.toggle('text-[#141B29]', diff !== 'easy');
+
+            document.getElementById('btn-diff-hard').classList.toggle('active', diff === 'hard');
+            document.getElementById('btn-diff-hard').classList.toggle('text-[#141B29]', diff !== 'hard');
+            playTone('select');
+        }
+
+        function resetGame() {
+            board = Array(9).fill(null);
+            turn = 'blue';
+            placedCount = { blue: 0, red: 0 };
+            selectedNode = null;
+            gameOver = false;
+            aiThinking = false;
+
+            document.getElementById('win-line-layer').innerHTML = '';
+            const modal = document.getElementById('win-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            renderAll();
+        }
+
+        function toggleRules(show) {
+            const modal = document.getElementById('rules-modal');
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        // Boot game on load
+        window.onload = initBoardUI;
+    </script>
+</body>
+</html>
